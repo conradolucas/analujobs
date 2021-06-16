@@ -9,7 +9,8 @@ var numberOfExecutions = 0;
 var numberOfReboot = 0;
 var whatsappConnection = null;
 
-const DURATION_INTERVAL_OF_EXECUTIONS = 3 * 60;
+const MINUTES_INTERVAL_OF_EXECUTIONS = 2;
+const DURATION_INTERVAL_OF_EXECUTIONS = MINUTES_INTERVAL_OF_EXECUTIONS * 60;
 const WHATSAPP_SESSION_FILE_PATH = './whatsapp-session.json';
 // const sendNotifyTo = '5511963646912';
 const sendNotifyTo = '5511991032631';
@@ -270,7 +271,7 @@ async function execRobot() {
 
         const page = await browser.newPage();
 
-        await page.setDefaultNavigationTimeout(0); 
+        await page.setDefaultNavigationTimeout(0);
 
         let jobsTechRecruiterList;
         let jobsTalentAcquisitionList;
@@ -279,8 +280,8 @@ async function execRobot() {
 
             await page.goto('https://www.linkedin.com/jobs/search/?f_TPR=r86400&geoId=106057199&keywords=Tech%20Recruiter&location=Brasil&sortBy=DD');
 
-            await sleep(500);
-            
+            await sleep(2000);
+
             jobsTechRecruiterList = await page.evaluate(async () => {
 
                 const jobsLiFromLinkedinDOM = document.querySelectorAll("ul.jobs-search__results-list li");
@@ -320,9 +321,11 @@ async function execRobot() {
 
             });
 
+            await sleep(15000);
+
             await page.goto('https://www.linkedin.com/jobs/search/?f_TPR=r86400&geoId=106057199&keywords=Talent%20Acquisition&location=Brasil&sortBy=DD');
 
-            await sleep(500);
+            await sleep(2000);
 
             jobsTalentAcquisitionList = await page.evaluate(async () => {
 
@@ -343,12 +346,24 @@ async function execRobot() {
                                 const link = li.querySelector('a.base-card__full-link') ? li.querySelector('a.base-card__full-link').href : li.querySelector('.base-card').href;
                                 const time = li.querySelector('time') ? li.querySelector('time').innerText : null;
 
-                                if (title.includes('Talent'))
+                                const titleLocaleLowerCase = title.toLowerCase();
+
+                                if (titleLocaleLowerCase.includes('talent') ||
+                                    titleLocaleLowerCase.includes('talento') ||
+                                    titleLocaleLowerCase.includes('acquisition') ||
+                                    titleLocaleLowerCase.includes('aquisição') ||
+                                    titleLocaleLowerCase.includes('recruiter') ||
+                                    titleLocaleLowerCase.includes('recruiting') ||
+                                    titleLocaleLowerCase.includes('recrutamento') ||
+                                    titleLocaleLowerCase.includes('seleção') ||
+                                    titleLocaleLowerCase.includes('rh') ||
+                                    titleLocaleLowerCase.includes('r&s')) {
                                     opportunities.push({ id, title, link, time });
+                                }
 
                                 if (position === jobsLiFromLinkedinDOM.length - 1)
                                     resolve(opportunities);
-                            
+
                             }, 4000);
                         })
                     })
@@ -362,11 +377,17 @@ async function execRobot() {
 
             });
 
+            await sleep(2000);
+
             await browser.close();
 
         } catch (error) {
-            console.log('error from node')
-            console.log(error)
+            console.log('error from node\n\n')
+            console.log(error);
+
+            player.play('./error.mp3', (err) => {
+                if (err) console.log(err)
+            })
         }
 
 
@@ -433,7 +454,7 @@ async function execRobot() {
         console.log(' ');
         console.log(' ');
 
-        const hasNewInMinutesAgo = () => minutesAgo.filter((job) => job.time.replace(/\D/g, "") <= 5);
+        const hasNewInMinutesAgo = () => minutesAgo.filter((job) => job.time.replace(/\D/g, "") <= 15);
 
         if (minutesAgo.length > 0 && hasNewInMinutesAgo()) {
 
@@ -491,8 +512,6 @@ async function execRobot() {
 
         resolve();
 
-
-
     })
 
 }
@@ -513,6 +532,17 @@ async function initRobot() {
 
 }
 
-initRobot();
 
-// execRobot();
+try {
+
+    initRobot();
+
+} catch (error) {
+    console.log('error from pai \n\n');
+    console.log(error);
+
+    player.play('./error.mp3', (err) => {
+        if (err) console.log(err)
+    })
+}
+
