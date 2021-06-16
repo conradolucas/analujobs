@@ -50,7 +50,10 @@ function whatsappConnect(whatsapp, withQRAwait = false) {
 
     return new Promise((resolve) => {
         const heckInterval = setInterval(() => {
-            if (isReady) resolve(isReady);
+            if (isReady) {
+                clearInterval(heckInterval);
+                resolve(isReady);
+            }
         }, 1000);
 
         if (!withQRAwait) {
@@ -67,13 +70,15 @@ function getWhatsappQrCode(whatsapp) {
     let whatsappQrCode = null;
 
     whatsapp.on('qr', (qr) => {
-        console.log(qr)
         whatsappQrCode = qr;
     });
 
     return new Promise((resolve) => {
-        setInterval(() => {
-            if (whatsappQrCode) resolve(whatsappQrCode);
+        const intervalWhatsQr = setInterval(() => {
+            if (whatsappQrCode) {
+                clearInterval(intervalWhatsQr)
+                resolve(whatsappQrCode);
+            }
         }, 500);
 
     });
@@ -92,7 +97,7 @@ async function whatsappSetup() {
             process.stdout.cursorTo(2);
             process.stdout.write(`${displayDot}\r`);
         } else {
-            displayDot += '';
+            displayDot += ' ';
             clearInterval(intervalLoading);
         }
     }, 300);
@@ -250,7 +255,7 @@ async function execRobot() {
                 process.stdout.cursorTo(2);
                 process.stdout.write(`${displayDot}\r`);
             } else {
-                displayDot += '';
+                displayDot += ' ';
                 clearInterval(intervalLoading);
             }
         }, 300);
@@ -399,7 +404,7 @@ async function execRobot() {
                 process.stdout.cursorTo(2);
                 process.stdout.write(`${displayDotFilter}\r`);
             } else {
-                displayDotFilter += '';
+                displayDotFilter += ' ';
                 clearInterval(intervalLoadingFilter);
             }
         }, 300);
@@ -452,7 +457,7 @@ async function execRobot() {
             if (sendedVacancyIds.length > 1) message = message.replace('NOVA', 'NOVAS').replace('VAGA', 'VAGAS').replace('DISPONÍVEL!_', 'DISPONÍVEIS!_ \n - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - \n');
 
             if (message !== '') {
-                whatsappConnection.sendMessage(`${sendNotifyTo}@c.us`, message);
+                // whatsappConnection.sendMessage(`${sendNotifyTo}@c.us`, message);
                 player.play('./aleluia.mp3', (err) => {
                     if (err) console.log(err)
                 })
@@ -504,7 +509,7 @@ async function initRobot() {
 
     await sleep(1000);
 
-    if (numberOfExecutions === 0) await execRobot(whatsappConnection);
+    if (numberOfExecutions === 0) await execRobot();
 
 }
 
