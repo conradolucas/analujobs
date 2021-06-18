@@ -140,8 +140,10 @@ function whatsappNotifyMessage(job, jobNumber) {
         `
     ${jobNumber === 0 ? `🚀 ${'_Nova Vaga Disponível!_'.toUpperCase()}\n` : '\n'}
     👉🏻  ${'```' + job.title + '```'}
+    🏦 *Empresa:*  ${job.company}
     🔗 *Link:*  ${job.link}
     ⏱ *Publicado há:*  ${job.time.replace('Há', '').replace('minutes', 'minutos').replace('ago', 'atrás')}
+    ${job.isEasy ? `\n👆 ${'*Candidatura simplificada!*'.toUpperCase()}` : ''}
    `
     return buildMessage;
 }
@@ -259,6 +261,8 @@ async function logger(msg, timeAwait = null) {
 }
 
 async function execRobot() {
+    let searchCompleted;
+
     return new Promise(async (resolve) => {
         try {
 
@@ -268,7 +272,7 @@ async function execRobot() {
 
             await sleep(900);
 
-            let searchCompleted = false;
+            searchCompleted = false;
             let displayDot = " ";
 
             console.log('🔎  Pesquisando\r');
@@ -321,8 +325,10 @@ async function execRobot() {
                                     : jobsLiFromLinkedinDOM[position].querySelector('h3.base-search-card__title').innerText;
                                 const link = li.querySelector('a.base-card__full-link') ? li.querySelector('a.base-card__full-link').href : li.querySelector('.base-card').href;
                                 const time = li.querySelector('time') ? li.querySelector('time').innerText : null;
+                                const company = li.querySelector('.base-search-card__subtitle') ? li.querySelector('.base-search-card__subtitle').innerText : null;
+                                const isEasy = li.querySelector('.job-search-card__easy-apply-label') ? true : false;
 
-                                opportunities.push({ id, title, link, time });
+                                opportunities.push({ id, title, company, link, time, isEasy });
 
                                 if (position === jobsLiFromLinkedinDOM.length - 1) {
                                     // manual inject, to debug:
@@ -368,6 +374,8 @@ async function execRobot() {
                                     : jobsLiFromLinkedinDOM[position].querySelector('h3.base-search-card__title').innerText;
                                 const link = li.querySelector('a.base-card__full-link') ? li.querySelector('a.base-card__full-link').href : li.querySelector('.base-card').href;
                                 const time = li.querySelector('time') ? li.querySelector('time').innerText : null;
+                                const company = li.querySelector('.base-search-card__subtitle') ? li.querySelector('.base-search-card__subtitle').innerText : null;
+                                const isEasy = li.querySelector('.job-search-card__easy-apply-label') ? true : false;
 
                                 const titleLocaleLowerCase = title.toLowerCase();
 
@@ -381,7 +389,7 @@ async function execRobot() {
                                     titleLocaleLowerCase.includes('seleção') ||
                                     titleLocaleLowerCase.includes('rh') ||
                                     titleLocaleLowerCase.includes('r&s')) {
-                                    opportunities.push({ id, title, link, time });
+                                    opportunities.push({ id, title, company, link, time, isEasy });
                                 }
 
                                 if (position === jobsLiFromLinkedinDOM.length - 1)
@@ -404,7 +412,19 @@ async function execRobot() {
 
             await browser.close();
 
-            const jobsList = [...jobsTechRecruiterList, ...jobsTalentAcquisitionList];
+            jobsTalentAcquisitionList = jobsTalentAcquisitionList
+                .filter((vacancy) => {
+                    return !jobsTechRecruiterList.find((item) => item.id === vacancy.id)
+                })
+
+            const jobsList = [...jobsTechRecruiterList, ...jobsTalentAcquisitionList].filter(({title}) => {
+                return (
+                    !title.toLowerCase().includes('manager') && 
+                    !title.toLowerCase().includes('gestor') && 
+                    !title.toLowerCase().includes('gerente') &&
+                    !title.toLowerCase().includes('lead')
+                )
+            });
 
             searchCompleted = true;
 
@@ -541,13 +561,13 @@ async function execRobot() {
 
             //console.log(`${chalk.bgGreen.red.bold(`${sendedVacanciesToday.length} vagas detectadas hoje!`)}\n\n`);
 
-            console.log(`${chalk.bgYellow.bold(`${sendedVacanciesToday.length} vagas`)} ${chalk.bgYellow.bold(`detectadas ${chalk.italic(`hoje`)}`)}\n\n`);
+            console.log(`${chalk.bgYellow.bold(`${sendedVacanciesToday.length} vagas detectadas hoje`)}\n\n`);
 
             await sleep(780);
  
             //console.log(`${chalk.bgYellowBright.black.bold(`${sendedVacanciesYesterday.length} vagas detectadas ontem!`)}`);
 
-            console.log(`${chalk.bgRed.bold(`${sendedVacanciesYesterday.length} vagas`)} ${chalk.bgRed.bold(`detectadas ${chalk.italic(`ontem`)}`)}\n\n`);
+            console.log(`${chalk.bgYellow.bold(`${sendedVacanciesYesterday.length} vagas detectadas ontem`)}\n\n`);
 
             await sleep(980);
 
@@ -570,6 +590,8 @@ async function execRobot() {
             console.log('error from node\n\n')
             console.log(error);
 
+            await sleep(2700);
+
             player.play('./error.mp3', (err) => {
                 if (err) console.log(err)
             })
@@ -577,8 +599,14 @@ async function execRobot() {
             whatsappConnection.sendMessage('5511963646912@c.us', `❌ *Atenção:* _Ocorreu um erro no AnaluJobs_\n\n ${'```' + error + '```' + '\nFrom: *NODE*'}`)
 
             console.log(`\n\nReiniciando ${chalk.bgMagenta.bold('Analujobs')}...\n\n`);
+
+            searchCompleted = true;
+
+            await sleep(2500);
+
             rebootRobot();
-            //initRobot();
+
+            resolve();
         }
     })
 
@@ -609,9 +637,8 @@ async function initRobot() {
             if (err) console.log(err)
         })
 
-        if (whatsappConnection) {
+        if (whatsappConnection)
             whatsappConnection.sendMessage('5511963646912@c.us', `❌ *Atenção:* _Ocorreu um erro no AnaluJobs_\n\n ${'```' + error + '```' + '\nFrom: *PAI*'}`)
-        }
 
     }
 
