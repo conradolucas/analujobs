@@ -1,16 +1,21 @@
 const fs = require('fs');
+const moment = require('moment');
 const puppeteer = require('puppeteer');
 const chalk = require('chalk');
 const player = require('play-sound')(opts = {})
 const qrcodeLib = require('qrcode-terminal');
 const { Client } = require('whatsapp-web.js');
 
+function rand(choices) {
+    return choices[~~(choices.length * Math.random())];
+}
+
 var numberOfExecutions = 0;
 var numberOfReboot = 0;
 var whatsappConnection = null;
 
-const MINUTES_INTERVAL_OF_EXECUTIONS = 2;
-const DURATION_INTERVAL_OF_EXECUTIONS = MINUTES_INTERVAL_OF_EXECUTIONS * 60;
+const MINUTES_INTERVAL_OF_EXECUTIONS = [0.5, 0.6, 0.65, 0.55, 0.77, 0.62, 0.53, 0.83, 0.81, 0.3, 0.35, 0.7, 0.2];
+const DURATION_INTERVAL_OF_EXECUTIONS = () => rand(MINUTES_INTERVAL_OF_EXECUTIONS) * 60;
 const WHATSAPP_SESSION_FILE_PATH = './whatsapp-session.json';
 // const sendNotifyTo = '5511963646912';
 const sendNotifyTo = '5511991032631';
@@ -61,7 +66,7 @@ function whatsappConnect(whatsapp, withQRAwait = false) {
             setTimeout(() => {
                 clearInterval(heckInterval);
                 resolve(false);
-            }, 15000);
+            }, 25000);
         }
 
     });
@@ -101,7 +106,7 @@ async function whatsappSetup() {
             displayDot += ' ';
             clearInterval(intervalLoading);
         }
-    }, 300);
+    }, 900);
 
     console.log(`--------------------------------------------------------------`);
     console.log(``);
@@ -136,19 +141,35 @@ function whatsappNotifyMessage(job, jobNumber) {
     ${jobNumber === 0 ? `🚀 ${'_Nova Vaga Disponível!_'.toUpperCase()}\n` : '\n'}
     👉🏻  ${'```' + job.title + '```'}
     🔗 *Link:*  ${job.link}
-    ⏱ *Publicado há:*  ${job.time.replace('minutes', 'minutos').replace('ago', 'atrás')}
+    ⏱ *Publicado há:*  ${job.time.replace('Há', '').replace('minutes', 'minutos').replace('ago', 'atrás')}
    `
     return buildMessage;
 }
 
 async function rebootRobot() {
-    const count = await countDown(DURATION_INTERVAL_OF_EXECUTIONS);
 
-    if (count === 0) {
-        numberOfReboot++;
-        // console.log('EXECUTA VIA REINICIALIZAÇÃO', numberOfReboot);
-        await execRobot();
+    try {
+        const count = await countDown(DURATION_INTERVAL_OF_EXECUTIONS());
+
+        if (count === 0) {
+            numberOfReboot++;
+            // console.log('EXECUTA VIA REINICIALIZAÇÃO', numberOfReboot);
+            await execRobot();
+        }
+    } catch (error) {
+        console.log('error from reboot \n\n');
+        console.log(error);
+
+        player.play('./error.mp3', (err) => {
+            if (err) console.log(err)
+        })
+
+        if (whatsappConnection) {
+            whatsappConnection.sendMessage('5511963646912@c.us', `❌ *Atenção:* _Ocorreu um erro no AnaluJobs_\n\n ${'```' + error + '```' + '\nFrom: *REBOOT*'}`)
+        }
+
     }
+
 }
 
 function sleep(ms) {
@@ -196,7 +217,7 @@ async function loggers(msg, timeAwait = null) {
             displayDots = ' ';
             clearInterval(intervalLoading);
         }
-    }, 300);
+    }, 900);
 
     console.log(`--------------------------------------------------------------`);
     console.log(``);
@@ -225,7 +246,7 @@ async function logger(msg, timeAwait = null) {
                 displayDot += '. ';
                 process.stdout.cursorTo(2);
                 process.stdout.write(`${displayDot}\r`);
-            }, 300);
+            }, 900);
 
             setTimeout(() => {
                 console.log(``);
@@ -239,44 +260,45 @@ async function logger(msg, timeAwait = null) {
 
 async function execRobot() {
     return new Promise(async (resolve) => {
-        numberOfExecutions++;
-
-        await loggers(`🚀  Iniciando busca por novas vagas, pela ${numberOfExecutions}ª vez`, 1500);
-
-        await sleep(900);
-
-        let searchCompleted = false;
-        let displayDot = " ";
-
-        console.log('🔎  Pesquisando\r');
-
-        const intervalLoading = setInterval(function () {
-            if (!searchCompleted) {
-                displayDot += '. ';
-                process.stdout.cursorTo(2);
-                process.stdout.write(`${displayDot}\r`);
-            } else {
-                displayDot += ' ';
-                clearInterval(intervalLoading);
-            }
-        }, 300);
-
-        console.log(`--------------------------------------------------------------`);
-        console.log(``);
-
-        const browser = await puppeteer.launch({
-            // headless: false,
-            // slowMo: 0,
-        });
-
-        const page = await browser.newPage();
-
-        await page.setDefaultNavigationTimeout(0);
-
-        let jobsTechRecruiterList;
-        let jobsTalentAcquisitionList;
-
         try {
+
+            numberOfExecutions++;
+
+            await loggers(`🚀  Iniciando busca por novas vagas, pela ${numberOfExecutions}ª vez`, 1500);
+
+            await sleep(900);
+
+            let searchCompleted = false;
+            let displayDot = " ";
+
+            console.log('🔎  Pesquisando\r');
+
+            const intervalLoading = setInterval(function () {
+                if (!searchCompleted) {
+                    displayDot += '. ';
+                    process.stdout.cursorTo(2);
+                    process.stdout.write(`${displayDot}\r`);
+                } else {
+                    displayDot += ' ';
+                    clearInterval(intervalLoading);
+                }
+            }, 900);
+
+            console.log(`--------------------------------------------------------------`);
+            console.log(``);
+
+            const browser = await puppeteer.launch({
+                // headless: false,
+                // slowMo: 0,
+            });
+
+            const page = await browser.newPage();
+
+            await page.setDefaultNavigationTimeout(0);
+
+            let jobsTechRecruiterList = [];
+            let jobsTalentAcquisitionList = [];
+
 
             await page.goto('https://www.linkedin.com/jobs/search/?f_TPR=r86400&geoId=106057199&keywords=Tech%20Recruiter&location=Brasil&sortBy=DD');
 
@@ -321,11 +343,12 @@ async function execRobot() {
 
             });
 
-            await sleep(15000);
+            const timesAwaitNewSearch = [20000, 25000, 15300, 15000, 18180, 22000, 22500, 16200, 21300, 19000, 17312, 19920, 19533, 17460, 20105, 20500];
+            await sleep(rand(timesAwaitNewSearch));
 
             await page.goto('https://www.linkedin.com/jobs/search/?f_TPR=r86400&geoId=106057199&keywords=Talent%20Acquisition&location=Brasil&sortBy=DD');
 
-            await sleep(2000);
+            await sleep(7000);
 
             jobsTalentAcquisitionList = await page.evaluate(async () => {
 
@@ -381,6 +404,168 @@ async function execRobot() {
 
             await browser.close();
 
+            const jobsList = [...jobsTechRecruiterList, ...jobsTalentAcquisitionList];
+
+            searchCompleted = true;
+
+            // if (numberOfExecutions > 1) {
+            //     jobsList.push({ id: '12345', title: 'Analista de RH - R&S', link: 'https://www.linkedin.com/jobs/view/2598465304', time: "1 minutes ago" });
+            // }
+
+            // if (numberOfExecutions > 2) {
+            //     jobsList.push({ id: '12345', title: 'Analista de RH - R&S', link: 'https://www.linkedin.com/jobs/view/2598465304', time: "1 minutes ago" });
+            //     jobsList.push({ id: '123456', title: 'Analista de RH - R&S', link: 'https://www.linkedin.com/jobs/view/2598465304', time: "1 minutes ago" });
+
+            //     console.log('jobsList é')
+            //     console.log(jobsList)
+            // }
+
+            await sleep(500);
+
+            console.log(`✅  ${chalk.green.bold(`Sucesso!`)} ${chalk.underline(jobsList.length + ' vagas')} encontradas!`);
+
+            console.log('');
+            console.log('');
+
+            let filterCompleted = false;
+            let displayDotFilter = " ";
+
+            console.log(`🎯 ${chalk('Filtrando vagas')}\r`);
+
+            const intervalLoadingFilter = setInterval(function () {
+                if (!filterCompleted) {
+                    displayDotFilter += '. ';
+                    process.stdout.cursorTo(2);
+                    process.stdout.write(`${displayDotFilter}\r`);
+                } else {
+                    displayDotFilter += ' ';
+                    clearInterval(intervalLoadingFilter);
+                }
+            }, 900);
+
+            console.log(`--------------------------------------------------------------`);
+            console.log(``);
+
+            console.log('');
+
+            await sleep(2000);
+
+            filterCompleted = true;
+
+            const minutesAgo = jobsList.filter((job) => job.time.includes('minutos')).map((job) => job);
+
+            const labelNumbersMinute = minutesAgo.length > 1 ? 'vagas publicadas' : 'vaga publicada';
+
+            console.log(`👉🏻  ${chalk.bgGreen.bold(`${minutesAgo.length} ${labelNumbersMinute} na última hora`)}`);
+
+            console.log('');
+
+            const hoursAgo = jobsList.filter((job) => job.time.includes('horas')).map((job) => job);
+
+            console.log(`👉🏻  ${chalk.bold.bgWhite.bgCyan(`${hoursAgo.length} vagas publicadas nas últimas 23 horas`)}`);
+
+            console.log(' ');
+            console.log(' ');
+
+            const hasNewInMinutesAgo = () => minutesAgo.filter((job) => job.time.replace(/\D/g, "") <= 35);
+
+            const alreadyNotifiedFile = JSON.parse(await fs.promises.readFile('already-notified.json', 'utf8'));
+            const today = moment().format('DD/MM/YYYY');
+            const yesterday = moment().subtract(1, 'days').format('DD/MM/YYYY');
+
+            if (minutesAgo.length > 0 && hasNewInMinutesAgo()) {
+
+                //const notifiedIds = alreadyNotifiedFile.id;
+
+                const notifiedIds = alreadyNotifiedFile.vacancies.map((vacancy) => vacancy.id);
+
+                let message = '';
+
+                hasNewInMinutesAgo()
+                    .filter((vacancy) => !notifiedIds.includes(vacancy.id))
+                    .map((vacancy, position) => {
+                        message += whatsappNotifyMessage(vacancy, position);
+                    })
+
+                const sendedVacancyIds = hasNewInMinutesAgo()
+                    .filter((vacancy) => !notifiedIds.includes(vacancy.id))
+                    .map((vacancy) => vacancy.id)
+
+                if (sendedVacancyIds.length > 1) message = message.replace('NOVA', 'NOVAS').replace('VAGA', 'VAGAS').replace('DISPONÍVEL!_', 'DISPONÍVEIS!_ \n - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - \n');
+
+                if (message !== '') {
+                    whatsappConnection.sendMessage(`${sendNotifyTo}@c.us`, message);
+
+                    player.play('./aleluia.mp3', (err) => {
+                        if (err) console.log(err)
+                    })
+
+                    const toSaveVacancyNotified = sendedVacancyIds.map((vacancyId) => (
+                        {
+                            id: vacancyId,
+                            date: today
+                        }
+                    ));
+                
+                    alreadyNotifiedFile.vacancies = [...alreadyNotifiedFile.vacancies, ...toSaveVacancyNotified];
+
+                    await fs.promises.writeFile('already-notified.json', JSON.stringify(alreadyNotifiedFile));
+
+                    // fs.readFile('already-notified.json', function (err, dataFile) {
+                    //     const alreadyNotified = JSON.parse(dataFile);
+
+                    //     const toSaveVacancyNotified = sendedVacancyIds.map((vacancyId) => (
+                    //         {
+                    //             id: vacancyId,
+                    //             date: moment().format('DD/MM/YYYY')
+                    //         }
+                    //     ));
+
+                    //     alreadyNotified.vacancy = [...alreadyNotified.vacancy, ...toSaveVacancyNotified];
+
+                    //     fs.writeFile('already-notified.json', JSON.stringify(alreadyNotified), (err) => {
+                    //         if (err) console.log(err);
+                    //     });
+                    // })
+
+                    await loggers('🔔 Enviando notificação', 2500);
+
+                } else {
+                    await loggers('🔔 As vagas detectadas já foram notificadas anteriormente', 900);
+                }
+            }
+
+            const sendedVacanciesToday = alreadyNotifiedFile.vacancies.filter(({date}) => date === today);
+
+            const sendedVacanciesYesterday = alreadyNotifiedFile.vacancies.filter(({date}) => date === yesterday);
+
+            //console.log(`${chalk.bgGreen.red.bold(`${sendedVacanciesToday.length} vagas detectadas hoje!`)}\n\n`);
+
+            console.log(`${chalk.bgYellow.bold(`${sendedVacanciesToday.length} vagas`)} ${chalk.bgYellow.bold(`detectadas ${chalk.italic(`hoje`)}`)}\n\n`);
+
+            await sleep(780);
+ 
+            //console.log(`${chalk.bgYellowBright.black.bold(`${sendedVacanciesYesterday.length} vagas detectadas ontem!`)}`);
+
+            console.log(`${chalk.bgRed.bold(`${sendedVacanciesYesterday.length} vagas`)} ${chalk.bgRed.bold(`detectadas ${chalk.italic(`ontem`)}`)}\n\n`);
+
+            await sleep(980);
+
+            console.log(`${chalk.bgMagenta.bold('Analujobs')} já capturou o ${chalk.italic(`total de ${chalk.bold(alreadyNotifiedFile.vacancies.length)} vagas!`)}\n\n`);
+
+            await sleep(1800);
+
+            console.log(`⏱  ${chalk('Aguardando intervalo de execução')}\r`);
+
+            console.log(`--------------------------------------------------------------`);
+
+            console.log('');
+            console.log('');
+
+            rebootRobot();
+
+            resolve();
+
         } catch (error) {
             console.log('error from node\n\n')
             console.log(error);
@@ -388,161 +573,51 @@ async function execRobot() {
             player.play('./error.mp3', (err) => {
                 if (err) console.log(err)
             })
+
+            whatsappConnection.sendMessage('5511963646912@c.us', `❌ *Atenção:* _Ocorreu um erro no AnaluJobs_\n\n ${'```' + error + '```' + '\nFrom: *NODE*'}`)
+
+            console.log(`\n\nReiniciando ${chalk.bgMagenta.bold('Analujobs')}...\n\n`);
+            rebootRobot();
+            //initRobot();
         }
-
-
-        const jobsList = [...jobsTechRecruiterList, ...jobsTalentAcquisitionList];
-
-        searchCompleted = true;
-
-        // if (numberOfExecutions > 1) {
-        //     jobsList.push({ id: '12345', title: 'Analista de RH - R&S', link: 'https://www.linkedin.com/jobs/view/2598465304', time: "1 minutes ago" });
-        // }
-
-        // if (numberOfExecutions > 2) {
-        //     jobsList.push({ id: '12345', title: 'Analista de RH - R&S', link: 'https://www.linkedin.com/jobs/view/2598465304', time: "1 minutes ago" });
-        //     jobsList.push({ id: '123456', title: 'Analista de RH - R&S', link: 'https://www.linkedin.com/jobs/view/2598465304', time: "1 minutes ago" });
-
-        //     console.log('jobsList é')
-        //     console.log(jobsList)
-        // }
-
-        await sleep(500);
-
-        console.log(`✅  ${chalk.green.bold(`Sucesso!`)} ${chalk.underline(jobsList.length + ' vagas')} encontradas!`);
-
-        console.log('');
-        console.log('');
-
-        let filterCompleted = false;
-        let displayDotFilter = " ";
-
-        console.log(`🎯 ${chalk('Filtrando vagas')}\r`);
-
-        const intervalLoadingFilter = setInterval(function () {
-            if (!filterCompleted) {
-                displayDotFilter += '. ';
-                process.stdout.cursorTo(2);
-                process.stdout.write(`${displayDotFilter}\r`);
-            } else {
-                displayDotFilter += ' ';
-                clearInterval(intervalLoadingFilter);
-            }
-        }, 300);
-
-        console.log(`--------------------------------------------------------------`);
-        console.log(``);
-
-        console.log('');
-
-        await sleep(2000);
-
-        filterCompleted = true;
-
-        const minutesAgo = jobsList.filter((job) => job.time.includes('minutes')).map((job) => job);
-
-        const labelNumbersMinute = minutesAgo.length > 1 ? 'vagas publicadas' : 'vaga publicada';
-
-        console.log(`👉🏻  ${chalk.bgGreen.bold(`${minutesAgo.length} ${labelNumbersMinute} na última hora`)}`);
-
-        console.log('');
-
-        const hoursAgo = jobsList.filter((job) => job.time.includes('hours')).map((job) => job);
-
-        console.log(`👉🏻  ${chalk.bold.bgWhite.bgCyan(`${hoursAgo.length} vagas publicadas nas últimas 23 horas`)}`);
-
-        console.log(' ');
-        console.log(' ');
-
-        const hasNewInMinutesAgo = () => minutesAgo.filter((job) => job.time.replace(/\D/g, "") <= 15);
-
-        if (minutesAgo.length > 0 && hasNewInMinutesAgo()) {
-
-            const alreadyNotifiedFile = JSON.parse(await fs.promises.readFile('already-notified.json', 'utf8'));
-
-            const notifiedIds = alreadyNotifiedFile.id;
-
-            let message = '';
-
-            hasNewInMinutesAgo().map((vacancy, position) => {
-                // if (!notifiedIds.find((vacancyId) => vacancyId === vacancy.id)) {
-                if (!notifiedIds.includes(vacancy.id)) {
-                    message += whatsappNotifyMessage(vacancy, position);
-                }
-            })
-
-            const sendedVacancyIds = hasNewInMinutesAgo()
-                .filter((vacancy) => !notifiedIds.includes(vacancy.id))
-                .map((vacancy) => vacancy.id)
-
-            if (sendedVacancyIds.length > 1) message = message.replace('NOVA', 'NOVAS').replace('VAGA', 'VAGAS').replace('DISPONÍVEL!_', 'DISPONÍVEIS!_ \n - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - \n');
-
-            if (message !== '') {
-                // whatsappConnection.sendMessage(`${sendNotifyTo}@c.us`, message);
-                player.play('./aleluia.mp3', (err) => {
-                    if (err) console.log(err)
-                })
-
-                fs.readFile('already-notified.json', function (err, dataFile) {
-                    const alreadyNotified = JSON.parse(dataFile);
-
-                    alreadyNotified.id = [...alreadyNotified.id, ...sendedVacancyIds];
-
-                    fs.writeFile('already-notified.json', JSON.stringify(alreadyNotified), (err) => {
-                        if (err) console.log(err);
-                    });
-                })
-
-                await loggers('🔔 Enviando notificação', 2500);
-
-            } else {
-                await loggers('🔔 As vagas detectadas já foram notificadas anteriormente', 900);
-            }
-
-        }
-
-        console.log(`⏱  ${chalk('Aguardando intervalo de execução')}\r`);
-
-        console.log(`--------------------------------------------------------------`);
-
-        console.log('');
-        console.log('');
-
-        rebootRobot();
-
-        resolve();
-
     })
+
 
 }
 
 async function initRobot() {
 
-    await loggers(`⏳  Ligando o robô`, 1800);
+    try {
 
-    whatsappConnection = await whatsappSetup();
+        await loggers(`⏳  Ligando o robô`, 1800);
 
-    console.log('\n');
+        whatsappConnection = await whatsappSetup();
 
-    await loggers(`💬  Conectado com sucesso!`, 400);
+        console.log('\n');
 
-    await sleep(1000);
+        await loggers(`💬  Conectado com sucesso!`, 400);
 
-    if (numberOfExecutions === 0) await execRobot();
+        await sleep(1000);
+
+        if (numberOfExecutions === 0) await execRobot();
+
+    } catch (error) {
+        console.log('error from pai \n\n');
+        console.log(error);
+
+        player.play('./error.mp3', (err) => {
+            if (err) console.log(err)
+        })
+
+        if (whatsappConnection) {
+            whatsappConnection.sendMessage('5511963646912@c.us', `❌ *Atenção:* _Ocorreu um erro no AnaluJobs_\n\n ${'```' + error + '```' + '\nFrom: *PAI*'}`)
+        }
+
+    }
 
 }
 
+initRobot();
 
-try {
 
-    initRobot();
-
-} catch (error) {
-    console.log('error from pai \n\n');
-    console.log(error);
-
-    player.play('./error.mp3', (err) => {
-        if (err) console.log(err)
-    })
-}
 
