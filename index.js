@@ -3,7 +3,7 @@ const puppeteer = require('puppeteer');
 const chalk = require('chalk');
 const player = require('play-sound')(opts = {})
 const qrcodeLib = require('qrcode-terminal');
-const { Client } = require('whatsapp-web.js');
+const { Client, LocalAuth } = require('whatsapp-web.js');
 
 var numberOfExecutions = 0;
 var numberOfReboot = 0;
@@ -11,27 +11,22 @@ var whatsappConnection = null;
 
 const MINUTES_INTERVAL_OF_EXECUTIONS = 2;
 const DURATION_INTERVAL_OF_EXECUTIONS = MINUTES_INTERVAL_OF_EXECUTIONS * 60;
-const WHATSAPP_SESSION_FILE_PATH = './whatsapp-session.json';
-// const sendNotifyTo = '5511963646912';
-const sendNotifyTo = '5511991032631';
-
-let sessionData;
-
-if (fs.existsSync(WHATSAPP_SESSION_FILE_PATH)) sessionData = require(WHATSAPP_SESSION_FILE_PATH);
+const sendNotifyTo = '5511963646912';
 
 function whatsappInitialize() {
-    const client = new Client({
-        session: sessionData
-    });
+    const wwebVersion = '2.2412.54';
 
-    client.on('authenticated', (session) => {
-        sessionData = session;
-        fs.writeFile(WHATSAPP_SESSION_FILE_PATH, JSON.stringify(session), function (err) {
-            if (err) {
-                console.error(err);
-            }
-        });
-    });
+    const client = new Client({
+        qrTimeoutMs: 0,
+        authStrategy: new LocalAuth(),
+        puppeteer: {
+            headless: false
+        },
+        webVersionCache: {
+            type: 'remote',
+            remotePath: `https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/${wwebVersion}.html`,
+        },
+      })
 
     client.on('disconnected', (reason) => {
         console.log('Client was logged out', reason);
@@ -208,35 +203,6 @@ async function loggers(msg, timeAwait = null) {
     loadingCompleted = true;
 }
 
-async function logger(msg, timeAwait = null) {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            let displayDot = " ";
-
-            console.log(` `);
-
-            console.log(msg);
-
-            console.log(`--------------------------------------------------------------`);
-
-            console.log(``);
-
-            const intervalDot = setInterval(function () {
-                displayDot += '. ';
-                process.stdout.cursorTo(2);
-                process.stdout.write(`${displayDot}\r`);
-            }, 300);
-
-            setTimeout(() => {
-                console.log(``);
-                clearInterval(intervalDot);
-                resolve();
-            }, timeAwait * 3 || 2500 * 3);
-
-        }, timeAwait || 2500);
-    })
-}
-
 async function execRobot() {
     return new Promise(async (resolve) => {
         numberOfExecutions++;
@@ -265,7 +231,7 @@ async function execRobot() {
         console.log(``);
 
         const browser = await puppeteer.launch({
-            // headless: false,
+            headless: false,
             // slowMo: 0,
         });
 
@@ -454,7 +420,7 @@ async function execRobot() {
         console.log(' ');
         console.log(' ');
 
-        const hasNewInMinutesAgo = () => minutesAgo.filter((job) => job.time.replace(/\D/g, "") <= 15);
+        const hasNewInMinutesAgo = () => minutesAgo.filter((job) => job.time.replace(/\D/g, "") <= 59);
 
         if (minutesAgo.length > 0 && hasNewInMinutesAgo()) {
 
@@ -465,7 +431,6 @@ async function execRobot() {
             let message = '';
 
             hasNewInMinutesAgo().map((vacancy, position) => {
-                // if (!notifiedIds.find((vacancyId) => vacancyId === vacancy.id)) {
                 if (!notifiedIds.includes(vacancy.id)) {
                     message += whatsappNotifyMessage(vacancy, position);
                 }
@@ -478,7 +443,7 @@ async function execRobot() {
             if (sendedVacancyIds.length > 1) message = message.replace('NOVA', 'NOVAS').replace('VAGA', 'VAGAS').replace('DISPONÍVEL!_', 'DISPONÍVEIS!_ \n - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - \n');
 
             if (message !== '') {
-                // whatsappConnection.sendMessage(`${sendNotifyTo}@c.us`, message);
+                whatsappConnection.sendMessage(`${sendNotifyTo}@c.us`, message);
                 player.play('./aleluia.mp3', (err) => {
                     if (err) console.log(err)
                 })
